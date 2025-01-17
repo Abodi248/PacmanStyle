@@ -1,0 +1,339 @@
+// Pac-Man Style Game 
+#include "splashkit.h"
+
+using namespace std;
+
+// Constants for game settings
+const int SCREEN_WIDTH = 800;
+const int SCREEN_HEIGHT = 600;
+const int TILE_SIZE = 40;
+const int NUM_ROWS = SCREEN_HEIGHT / TILE_SIZE;
+const int NUM_COLS = SCREEN_WIDTH / TILE_SIZE;
+
+// Global variables
+int score = 0;
+int lives = 3;
+int game_speed = 20;
+bool game_start = false;
+bool game_over = false;
+bool all_dots_collected;
+bool win_game = false;
+int ghost_move_counter = 0;
+int ghost_move_threshold = 5;
+
+
+// Enums for tile types
+enum TileType { EMPTY, WALL, DOT };
+
+// Data structures
+struct Position 
+{
+    int row;
+    int col;
+};
+
+
+// Maze representation
+TileType maze[NUM_ROWS][NUM_COLS];
+
+// Function to initialize the maze
+void initialize_maze()
+{
+    
+    for (int row = 0; row < NUM_ROWS; row++)
+    {
+        for (int col = 0; col < NUM_COLS; col++)
+        {
+            if (row == 0 || row == NUM_ROWS - 1 || col == 0 || col == NUM_COLS - 1)
+                maze[row][col] = WALL;
+            else if((row + col) % 5 == 0)
+                maze[row][col] = DOT;
+            else 
+                maze[row][col] = EMPTY;  
+        }
+    }
+}
+
+// Function to draw the maze
+void draw_maze()
+{
+    
+    for (int row = 0; row < NUM_ROWS; row++)
+    {
+        for (int col = 0; col < NUM_COLS; col++)
+        {
+            switch (maze[row][col])
+            {
+            case WALL:
+                draw_rectangle(COLOR_BLUE, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+                break;
+            case DOT:
+                fill_circle(COLOR_YELLOW, col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 8);
+                break;
+            case EMPTY:
+                draw_rectangle(COLOR_BLACK, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                break;
+            default:
+                break;
+            }
+        }
+    }
+}
+
+// Function to handle player movement
+void move_player(Position &player, char direction)
+{
+    Position new_pos = player;
+    switch (direction)
+    {
+    case 'W':
+        new_pos.row--;
+        break;
+    case 'S':
+        new_pos.row++;
+        break;
+    case 'A':
+        new_pos.col--;
+        break;
+    case 'D':
+        new_pos.col++;
+        break;
+    default:
+        break;
+    }
+
+    // Check collision with walls
+    if (maze[new_pos.row][new_pos.col] != WALL)
+    {
+        player = new_pos;
+
+        // Collect dots
+        if (maze[player.row][player.col] == DOT)
+        {
+            score += 10;
+            maze[player.row][player.col] = EMPTY;
+        }
+    }
+}
+void move_ghost(Position &ghost, char g_direction)
+{
+    Position g_new_pos = ghost;
+    switch (g_direction)
+    {
+    case 'W':
+        g_new_pos.row--;
+        break;
+    case 'S':
+        g_new_pos.row++;
+        break;
+    case 'A':
+        g_new_pos.col--;
+        break;
+    case 'D':
+        g_new_pos.col++;
+        break;
+    default:
+        break;
+    }
+
+    // Check collision with walls
+    if (maze[g_new_pos.row][g_new_pos.col] != WALL)
+    {
+        ghost = g_new_pos;
+
+    }
+}
+
+void check_state()
+{
+    all_dots_collected = true; // Assume all dots are collected initially
+
+    for (int row = 0; row < NUM_ROWS; row++)
+    {
+        for (int col = 0; col < NUM_COLS; col++)
+        {
+            if (maze[row][col] == DOT) // If any dot is found
+            {
+                all_dots_collected = false; // Not all dots are collected
+                return; // Exit the function early
+            }
+        }
+    }
+}
+
+void reset_game(Position &player, Position &ghost)
+{
+    score = 0;
+    lives = 3;
+    game_speed = 20;
+    game_start = false;
+    game_over = false;
+    win_game = false;
+    all_dots_collected = false;
+
+    
+    play_music("pacman");
+
+    initialize_maze();
+
+    // Reset player and ghost positions
+    player = {NUM_ROWS / 2, NUM_COLS / 2};
+    ghost = {NUM_ROWS / 4, NUM_COLS / 3};
+}
+
+
+// Main game loop
+void run_game()
+{
+    Position player = {NUM_ROWS / 2, NUM_COLS / 2};
+    Position ghost = {NUM_ROWS / 4, NUM_COLS / 3};
+    double rotation_angle = 0;
+
+    initialize_maze();
+
+
+    while (!window_close_requested("Pac-Man Style Game"))
+    {
+        process_events();
+
+        
+        if (!(game_over || win_game))
+        {
+            // Player movement
+            if (key_down(W_KEY))
+            {
+                move_player(player, 'W');
+                rotation_angle = 270;
+                game_start = true;
+            }
+            else if (key_down(S_KEY))
+            {
+                move_player(player, 'S');
+                rotation_angle = 90;
+                game_start = true;
+            }
+            else if (key_down(A_KEY))
+            {
+                move_player(player, 'A');
+                rotation_angle = 180;
+                game_start = true;
+            }
+            else if (key_down(D_KEY))
+            {
+                move_player(player, 'D');
+                rotation_angle = 0;
+                game_start = true;
+            }
+
+            
+            //ghost movement
+
+            if (game_start)
+            {   
+                
+                ghost_move_counter++;
+                if (ghost_move_counter >= ghost_move_threshold)
+                {
+                    ghost_move_counter = 0;
+                    if (player.row < ghost.row)
+                    {
+                        move_ghost(ghost, 'W');
+                    }
+                    if (player.row > ghost.row)
+                    {
+                        move_ghost(ghost, 'S');
+                    }
+                    if (player.col < ghost.col)
+                    {
+                        move_ghost(ghost, 'A');
+                    }
+                    if (player.col > ghost.col)
+                    {
+                        move_ghost(ghost, 'D');
+                    }
+                }
+            }
+
+            //game over
+            if (player.col == ghost.col)
+            {
+                if ( player.row == ghost.row)
+                {
+                    game_over = true;
+                    stop_music();
+                    play_sound_effect("death");
+
+                }
+            }
+
+            // Check game state
+            check_state();
+            if (all_dots_collected)
+            {
+                win_game = true;
+                stop_music();
+                play_sound_effect("waka");
+            }
+        }
+        else
+        {
+            if (key_typed(R_KEY))
+            {
+                reset_game(player, ghost);
+            }
+        }
+        
+        
+        // Drawing
+        clear_screen(COLOR_BLACK);
+        draw_maze();
+
+
+        // Draw player
+        drawing_options options = option_rotate_bmp(rotation_angle);
+
+        
+        draw_bitmap("pacman", player.col * TILE_SIZE, player.row * TILE_SIZE, options);
+        
+        draw_bitmap("ghost", ghost.col * TILE_SIZE, ghost.row * TILE_SIZE);
+
+
+        // Display score and win message
+        draw_text("Score: " + to_string(score), COLOR_WHITE, 10, 10);
+        if (win_game)
+        {
+            draw_text("Good! You collected all dots!", COLOR_AZURE, 270, SCREEN_HEIGHT / 2.1);
+            draw_text("Your Score was " + to_string(score), COLOR_GREEN, 300, SCREEN_HEIGHT / 2);
+            draw_text("Press R to restart", COLOR_GREEN, 300, SCREEN_HEIGHT / 2.2);
+        }
+        else if (game_over)
+        {
+            draw_text("BAD! You died!", COLOR_AZURE, 330, SCREEN_HEIGHT / 2.1);
+            draw_text("Your Score was " + to_string(score), COLOR_GREEN, 315, SCREEN_HEIGHT / 2);
+            draw_text("Press R to restart", COLOR_GREEN, 315, SCREEN_HEIGHT / 2.2);
+        }
+
+        refresh_screen(game_speed);
+    }
+}
+
+
+int main()
+{
+    open_window("Pac-Man Style Game", SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    
+    //loading all Assets
+    load_bitmap("ghost","ghost.png");
+    load_bitmap("pacman","pacman.png");
+    load_sound_effect("death","die.wav");
+    load_sound_effect("waka","waka.wav");
+    load_music("pacman","pacman.wav");
+    load_bitmap("pill","pill.png");
+
+    play_music("pacman.wav");
+    run_game();
+    
+    return 0;
+}
